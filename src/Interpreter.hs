@@ -1,6 +1,8 @@
-module Lib
-    ( runSchemeParser 
-    ) where
+module Interpreter (
+    readExpr,
+    runSchemeParser,
+    runSchemeEval
+  ) where
 
 import Text.ParserCombinators.Parsec hiding (spaces) 
 import System.Environment
@@ -12,8 +14,23 @@ data LispVal = Atom String
              | Number Integer
              | String String
              | Bool Bool
-  deriving (Show)
 
+-- Pretty Print 
+showVal :: LispVal -> String 
+showVal expr = case expr of
+  String contents      -> "\"" ++ contents ++ "\""
+  Atom name            -> name
+  Number contents      -> show contents
+  Bool True            -> "#t"
+  Bool False           -> "#f"
+  List contents        -> "(" ++ unwordsList contents ++ ")"
+  DottedList head tail -> "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
+  where
+    unwordsList = unwords . map showVal
+
+instance Show LispVal where show = showVal
+
+-- Parser
 symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 
@@ -136,12 +153,20 @@ parseExpr = parseNumber
          <|> parseQuoted
          <|> parseList
 
-readExpr :: String -> String
+readExpr :: String -> LispVal 
 readExpr input = case parse parseExpr "lisp" input of
-  Left err -> "No match: " ++ show err
-  Right x -> "Found value: " ++ show x
+  Left err -> error $ "No match: " ++ show err
+  Right val -> val 
 
 runSchemeParser :: IO () 
-runSchemeParser = do
-  (expr:_) <- getArgs
-  putStrLn $ readExpr expr
+runSchemeParser = getArgs >>= print . readExpr . head
+
+-- Evaluator
+eval :: LispVal -> LispVal
+eval expr = case expr of
+  List [Atom "quote", val] -> val
+  _                        -> expr
+
+runSchemeEval :: IO ()
+runSchemeEval = getArgs >>= print . eval . readExpr . head
+
