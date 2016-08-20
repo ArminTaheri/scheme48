@@ -20,6 +20,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , text
                      , parsec
+                     , mtl
   default-language:    Haskell2010
 
 executable scheme48-exe
