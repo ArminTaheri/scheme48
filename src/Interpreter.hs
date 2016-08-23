@@ -1,9 +1,11 @@
 module Interpreter (
-    readExpr,
-    runSchemeParser,
-    runSchemeEval
+      readExpr
+    , runSchemeParser
+    , runSchemeEval
+    , runSchemeRepl
   ) where
 
+import System.IO
 import Control.Monad.Error
 import Text.ParserCombinators.Parsec hiding (spaces)
 import System.Environment
@@ -201,8 +203,8 @@ readExpr input = case parse parseExpr "lisp" input of
   Left err  -> throwError $ Parser err
   Right val -> return val
 
-runSchemeParser :: IO ()
-runSchemeParser = getArgs >>= print . resolveValue. readExpr . head
+runSchemeParser :: String -> IO ()
+runSchemeParser = print . resolveValue. readExpr
 
 -- Evaluator
 eval :: LispVal -> ThrowsError LispVal
@@ -419,8 +421,23 @@ equal args = case args of
     projections = [Projection numProject, Projection strProject, Projection boolProject]
     applicativeProj = map equalUnder projections
 
-runSchemeEval :: IO ()
-runSchemeEval = do
-  (expr:_) <- getArgs
+runSchemeEval :: String -> IO ()
+runSchemeEval expr = do
   let evaled = show <$> (readExpr expr >>= eval)
   putStrLn . resolveValue . trapError $ evaled
+
+-- REPL
+until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
+until_ pred prompt action = do
+  result <- prompt
+  unless (pred result) $
+    action result >> until_ pred prompt action
+
+readPrompt :: String -> IO String
+readPrompt prompt = flushStr prompt >> getLine
+  where
+    flushStr str = putStr str >> hFlush stdout
+
+runSchemeRepl :: IO ()
+runSchemeRepl = until_ (== "quit") (readPrompt "Lisp>>> ") runSchemeEval 
+
